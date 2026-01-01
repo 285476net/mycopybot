@@ -111,8 +111,39 @@ def set_channel(message):
 @bot.message_handler(commands=['checkchannel'])
 def check_channel(message):
     if message.from_user.id != ADMIN_ID: return
-    # DB ထဲက လက်ရှိ Channel ကို ပြမယ်
-    bot.reply_to(message, f"📡 Current Target Channel: `{current_config['channel_id']}`")
+    
+    channel_id = current_config['channel_id']
+    
+    try:
+        # Telegram API ကို လှမ်းမေးပြီး Channel အချက်အလက်ယူမယ်
+        chat = bot.get_chat(channel_id)
+        chat_title = chat.title
+        
+        if chat.username:
+            # Public Channel ဆိုရင် username နဲ့ Link လုပ်မယ်
+            link = f"https://t.me/{chat.username}"
+        else:
+            # Private Channel ဆိုရင် ID နဲ့ Link ဖန်တီးမယ်
+            # -100 ကို ဖြုတ်ပြီး /c/ ထည့်ရပါတယ်
+            clean_id = str(channel_id).replace("-100", "")
+            link = f"https://t.me/c/{clean_id}/1"
+            
+        text = (
+            f"📡 **Target Channel Info**\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"📛 Name: **{chat_title}**\n"
+            f"🆔 ID: `{channel_id}`\n"
+            f"🔗 Link: [Click Here]({link})"
+        )
+    except Exception as e:
+        # Bot က Channel ထဲမှာ Admin မဟုတ်ရင် Detail ကြည့်လို့မရပါဘူး
+        text = (
+            f"📡 **Current ID:** `{channel_id}`\n\n"
+            f"❌ Channel အချက်အလက်ကို ဆွဲယူမရပါ။\n"
+            f"(Bot ကို Channel Admin ပေးထားမှ Link ထုတ်ပေးနိုင်ပါမည်)"
+        )
+
+    bot.reply_to(message, text, parse_mode="Markdown")
 
 @bot.message_handler(commands=['auth'])
 def add_user(message):
@@ -148,6 +179,32 @@ def remove_user(message):
         bot.reply_to(message, f"🗑 User ID `{target_id}` removed from Database.")
     except:
         bot.reply_to(message, "Error.")
+
+# Authorized Users စာရင်းကို ကြည့်ရန်
+# သုံးပုံ: /users
+@bot.message_handler(commands=['users'])
+def list_authorized_users(message):
+    if message.from_user.id != ADMIN_ID: return
+    
+    user_list = current_config.get('authorized_users', [])
+    
+    text = f"👥 **Authorized Users Total: {len(user_list)}**\n"
+    text += "━━━━━━━━━━━━━━━━\n"
+    
+    for uid in user_list:
+        try:
+            # User ID ကနေ နာမည်လှမ်းစစ်မယ်
+            user = bot.get_chat(uid)
+            name = user.first_name
+            # Username ရှိရင် ထည့်ပြမယ်၊ မရှိရင် ဗလာထားမယ်
+            username = f"(@{user.username})" if user.username else ""
+            
+            text += f"👤 {name} {username}\n🆔 `{uid}`\n\n"
+        except:
+            # User က Bot ကို Block ထားရင် နာမည်ပေါ်မှာ မဟုတ်ပါ
+            text += f"👤 Unknown User\n🆔 `{uid}`\n\n"
+            
+    bot.reply_to(message, text, parse_mode="Markdown")
 
 # ==========================================
 # BATCH PROCESSING LOGIC
@@ -284,3 +341,4 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
