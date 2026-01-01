@@ -206,19 +206,23 @@ def list_authorized_users(message):
             
     bot.reply_to(message, text, parse_mode="Markdown")
 
-# ==========================================
-# BATCH PROCESSING LOGIC
+# BATCH PROCESSING LOGIC (UPDATED)
 # ==========================================
 def process_batch(chat_id):
     if chat_id not in batch_data:
         return
 
     messages = batch_data[chat_id]['messages']
-    target_channel = current_config['channel_id'] # Config ထဲက Channel ID ကို ယူသုံးမယ်
+    target_channel = current_config['channel_id'] 
 
+    # 1. BATCH PROCESSING (ဖိုင်အများကြီးလာရင်)
     if len(messages) > 1:
-        bot.send_message(chat_id, f"✅ ဇာတ်ကား {len(messages)} ကား လက်ခံရရှိသည်။ Channel သို့ ပို့နေပါပြီ...")
+        total_files = len(messages)
+        bot.send_message(chat_id, f"✅ ဇာတ်ကား {total_files} ကား လက်ခံရရှိသည်။ Channel သို့ ပို့နေပါပြီ...\n(ခဏစောင့်ပါ၊ ပြီးရင် Report ပြန်ပို့ပေးပါမည်)")
         
+        success_count = 0
+        failed_messages = [] # Fail ဖြစ်တဲ့ကောင်တွေကို မှတ်ထားမယ့် List
+
         for msg in messages:
             try:
                 original_caption = msg.caption if msg.caption else ""
@@ -230,14 +234,39 @@ def process_batch(chat_id):
                     caption=original_caption,
                     parse_mode="Markdown"
                 )
-                time.sleep(2) 
+                success_count += 1
+                # Rate Limit မထိအောင် ၃ စက္ကန့်လောက် စောင့်တာ ပိုစိတ်ချရတယ်
+                time.sleep(3) 
 
             except Exception as e:
-                print(f"Error sending batch: {e}")
+                print(f"Error sending msg {msg.message_id}: {e}")
+                # Error တက်ရင် Fail list ထဲ ထည့်မှတ်ထားမယ်
+                failed_messages.append(msg)
                 continue
         
-        bot.send_message(chat_id, "✅ အားလုံးပို့ပြီးပါပြီ။")
+        # 2. REPORTING (အကုန်ပြီးသွားရင် စာရင်းချုပ်ပြမယ်)
+        report_text = (
+            f"📊 **Batch Report**\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"📥 Total: {total_files}\n"
+            f"✅ Success: {success_count}\n"
+            f"❌ Failed: {len(failed_messages)}"
+        )
+        
+        bot.send_message(chat_id, report_text, parse_mode="Markdown")
+
+        # 3. FAILED FILES NOTIFICATION (မရောက်လိုက်တဲ့ ဖိုင်တွေကို ပြန်ပြောပြမယ်)
+        if failed_messages:
+            bot.send_message(chat_id, "⚠️ **အောက်ပါဖိုင်များသည် Error တက်ပြီး Channel သို့ မရောက်ပါ:**")
+            for fail_msg in failed_messages:
+                try:
+                    # Fail ဖြစ်တဲ့ ဖိုင်ကို Reply ပြန်ပြီး ပြောပေးမယ်
+                    bot.reply_to(fail_msg, "❌ ဒီဖိုင် Error တက်သွားလို့ Channel ကို မရောက်ပါဘူး။ ပြန်ပို့ပေးပါ။")
+                    time.sleep(1)
+                except:
+                    pass
     
+    # 4. SINGLE FILE PROCESSING (ဖိုင် ၁ ခုတည်းလာရင်)
     elif len(messages) == 1:
         msg = messages[0]
         pending_files[chat_id] = {
@@ -246,6 +275,7 @@ def process_batch(chat_id):
         }
         bot.reply_to(msg, "✏️ **ဒီကားအတွက် Caption ရေးပို့ပေးပါ...**")
 
+    # Clear Data
     if chat_id in batch_data:
         del batch_data[chat_id]
 
@@ -341,4 +371,5 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
