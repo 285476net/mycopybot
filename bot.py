@@ -283,7 +283,7 @@ def process_batch(chat_id):
 # HANDLERS
 # ==========================================
 
-@bot.message_handler(content_types=['video', 'document'])
+@bot.message_handler(content_types=['video', 'document', 'photo'])
 def receive_video(message):
     # Check Permission
     if not is_authorized(message.from_user.id):
@@ -371,5 +371,6 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
