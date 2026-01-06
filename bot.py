@@ -33,7 +33,8 @@ def get_config():
         new_data = {
             "_id": "bot_config",
             "channel_id": default_channel,
-            "authorized_users": [ADMIN_ID]
+            "authorized_users": [ADMIN_ID],
+            "custom_caption": None
         }
         config_col.insert_one(new_data)
         return new_data
@@ -180,6 +181,35 @@ def remove_user(message):
     except:
         bot.reply_to(message, "Error.")
 
+# ==========================================
+# CAPTION SETTINGS (NEW)
+# ==========================================
+@bot.message_handler(commands=['setcaption'])
+def set_custom_caption_text(message):
+    if not is_authorized(message.from_user.id): return
+
+    try:
+        # /setcaption နောက်က စာသားကို ယူမည်
+        caption_text = message.text.split(maxsplit=1)[1]
+        
+        # DB & Memory Update
+        config_col.update_one({"_id": "bot_config"}, {"$set": {"custom_caption": caption_text}})
+        current_config['custom_caption'] = caption_text
+        
+        bot.reply_to(message, f"✅ ပုံသေစာသား သတ်မှတ်ပြီးပါပြီ:\n\n`{caption_text}`", parse_mode="Markdown")
+    except IndexError:
+        bot.reply_to(message, "⚠️ Usage: `/setcaption Your Text Here`")
+
+@bot.message_handler(commands=['delcaption'])
+def delete_custom_caption_text(message):
+    if not is_authorized(message.from_user.id): return
+
+    # DB & Memory Update (None ပြန်လုပ်မည်)
+    config_col.update_one({"_id": "bot_config"}, {"$set": {"custom_caption": None}})
+    current_config['custom_caption'] = None
+    
+    bot.reply_to(message, "🗑 ပုံသေစာသားကို ဖျက်လိုက်ပါပြီ။")
+
 # Authorized Users စာရင်းကို ကြည့်ရန်
 # သုံးပုံ: /users
 @bot.message_handler(commands=['users'])
@@ -226,6 +256,9 @@ def process_batch(chat_id):
         for msg in messages:
             try:
                 original_caption = msg.caption if msg.caption else ""
+
+                if current_config.get('custom_caption'):
+                    original_caption += f"\n\n{current_config['custom_caption']}"
                 
                 bot.copy_message(
                     chat_id=target_channel,
@@ -316,9 +349,8 @@ def receive_caption(message):
 
     try:
         final_caption = user_input
-        if user_input == "/original":
-             bot.send_message(chat_id, "Single File ဖြစ်လို့ Caption ရေးပေးမှရပါမယ်။")
-             return
+        if current_config.get('custom_caption'):
+            final_caption += f"\n\n{current_config['custom_caption']}"
 
         bot.copy_message(
             chat_id=target_channel,
@@ -371,6 +403,7 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
 
