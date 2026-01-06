@@ -264,8 +264,7 @@ def process_batch(chat_id):
                     chat_id=target_channel,
                     from_chat_id=chat_id,
                     message_id=msg.message_id,
-                    caption=original_caption,
-                    parse_mode="Markdown"
+                    caption=original_caption
                 )
                 success_count += 1
                 # Rate Limit မထိအောင် ၃ စက္ကန့်လောက် စောင့်တာ ပိုစိတ်ချရတယ်
@@ -356,8 +355,7 @@ def receive_caption(message):
             chat_id=target_channel,
             from_chat_id=file_info['from_chat_id'],
             message_id=file_info['message_id'],
-            caption=final_caption,
-            parse_mode="Markdown"
+            caption=final_caption
         )
         bot.reply_to(message, "✅ Channel သို့ ပို့ပြီးပါပြီ။")
     except Exception as e:
@@ -403,6 +401,7 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
 
