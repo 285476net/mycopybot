@@ -245,42 +245,38 @@ def process_batch(chat_id):
     messages = batch_data[chat_id]['messages']
     target_channel = current_config['channel_id'] 
 
-    # 1. BATCH PROCESSING (ဖိုင်အများကြီးလာရင်)
     if len(messages) > 1:
         total_files = len(messages)
         bot.send_message(chat_id, f"✅ ဇာတ်ကား {total_files} ကား လက်ခံရရှိသည်။ Channel သို့ ပို့နေပါပြီ...\n(ခဏစောင့်ပါ၊ ပြီးရင် Report ပြန်ပို့ပေးပါမည်)")
         
         success_count = 0
-        failed_messages = [] # Fail ဖြစ်တဲ့ကောင်တွေကို မှတ်ထားမယ့် List
+        failed_messages = []
 
         for msg in messages:
-    try:
-        original_caption = msg.caption if msg.caption else ""
-        custom_txt = current_config.get('custom_caption') if current_config.get('custom_caption') else ""
-        
-        # စုစုပေါင်း ၁၀၂၄ ထက်မကျော်အောင် တွက်ချက်ခြင်း
-        if custom_txt:
-            # custom_txt + newline ၂ ခု အတွက် နေရာဖယ်ပြီး original ကို ဖြတ်မယ်
-            max_original_len = 1024 - len(custom_txt) - 2
-            safe_original = original_caption[:max_original_len]
-            final_caption = f"{safe_original}\n\n{custom_txt}"
-        else:
-            final_caption = original_caption[:1024]
+            try:
+                original_caption = msg.caption if msg.caption else ""
+                custom_txt = current_config.get('custom_caption') if current_config.get('custom_caption') else ""
+                
+                # ၁၀၂၄ limit အတွက် တွက်ချက်ခြင်း
+                if custom_txt:
+                    max_original_len = 1024 - len(custom_txt) - 2
+                    safe_original = original_caption[:max_original_len]
+                    final_caption = f"{safe_original}\n\n{custom_txt}"
+                else:
+                    final_caption = original_caption[:1024]
 
-        bot.copy_message(
-            chat_id=target_channel,
-            from_chat_id=chat_id,
-            message_id=msg.message_id,
-            caption=final_caption
-        )
-
+                bot.copy_message(
+                    chat_id=target_channel,
+                    from_chat_id=chat_id,
+                    message_id=msg.message_id,
+                    caption=final_caption
+                )
+                success_count += 1 # အောင်မြင်မှုအရေအတွက်ပေါင်းရန်
+                time.sleep(3) # Telegram Flood limit မမိအောင် ၃ စက္ကန့်ခြားသည်
             except Exception as e:
                 print(f"Error sending msg {msg.message_id}: {e}")
-                # Error တက်ရင် Fail list ထဲ ထည့်မှတ်ထားမယ်
                 failed_messages.append(msg)
-                continue
         
-        # 2. REPORTING (အကုန်ပြီးသွားရင် စာရင်းချုပ်ပြမယ်)
         report_text = (
             f"📊 **Batch Report**\n"
             f"━━━━━━━━━━━━━━━━\n"
@@ -288,21 +284,17 @@ def process_batch(chat_id):
             f"✅ Success: {success_count}\n"
             f"❌ Failed: {len(failed_messages)}"
         )
-        
         bot.send_message(chat_id, report_text, parse_mode="Markdown")
 
-        # 3. FAILED FILES NOTIFICATION (မရောက်လိုက်တဲ့ ဖိုင်တွေကို ပြန်ပြောပြမယ်)
         if failed_messages:
             bot.send_message(chat_id, "⚠️ **အောက်ပါဖိုင်များသည် Error တက်ပြီး Channel သို့ မရောက်ပါ:**")
             for fail_msg in failed_messages:
                 try:
-                    # Fail ဖြစ်တဲ့ ဖိုင်ကို Reply ပြန်ပြီး ပြောပေးမယ်
-                    bot.reply_to(fail_msg, "❌ ဒီဖိုင် Error တက်သွားလို့ Channel ကို မရောက်ပါဘူး။ ပြန်ပို့ပေးပါ။")
+                    bot.reply_to(fail_msg, "❌ ဒီဖိုင် Error တက်သွားလို့ Channel ကို မရောက်ပါဘူး။")
                     time.sleep(1)
                 except:
                     pass
     
-    # 4. SINGLE FILE PROCESSING (ဖိုင် ၁ ခုတည်းလာရင်)
     elif len(messages) == 1:
         msg = messages[0]
         pending_files[chat_id] = {
@@ -311,10 +303,8 @@ def process_batch(chat_id):
         }
         bot.reply_to(msg, "✏️ **ဒီကားအတွက် Caption ရေးပို့ပေးပါ...**")
 
-    # Clear Data
     if chat_id in batch_data:
         del batch_data[chat_id]
-
 # ==========================================
 # HANDLERS
 # ==========================================
@@ -414,6 +404,7 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
 
