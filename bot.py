@@ -319,7 +319,7 @@ def process_batch(chat_id):
 def receive_video(message):
     # Check Permission
     if not is_authorized(message.from_user.id):
-        bot.reply_to(message, "⛔️ You are not authorized.")
+        bot.reply_to(message, "⛔️ You are not authorized. Bot ကိုအသုံးပြုနိုင်ရန် admin- @moviestoreadmin ထံ ဆက်သွယ်ဝယ်ယူပါ။ ")
         return
 
     chat_id = message.chat.id
@@ -401,6 +401,7 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
 
