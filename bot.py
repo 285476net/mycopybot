@@ -256,15 +256,24 @@ def process_batch(chat_id):
         for msg in messages:
             try:
                 original_caption = msg.caption if msg.caption else ""
-
-                if current_config.get('custom_caption'):
-                    original_caption += f"\n\n{current_config['custom_caption']}"
+                custom_text = current_config.get('custom_caption', "")
                 
+                if custom_text:
+                    # စုစုပေါင်း ၁၀၂၄ ထက်မကျော်အောင် original ကို ဖြတ်မယ်
+                    # custom_text အတွက် နေရာချန်ပြီး ကျန်တာကိုပဲ ယူမယ် (\n\n အတွက် ၄ လုံးစာ နုတ်ထားတယ်)
+                    max_original_len = 1024 - len(custom_text) - 4
+                    if len(original_caption) > max_original_len:
+                        original_caption = original_caption[:max_original_len]
+                    
+                    final_caption = f"{original_caption}\n\n{custom_text}"
+                else:
+                    final_caption = original_caption[:1024] # custom မရှိရင်လည်း ၁၀၂၄ မှာ ဖြတ်မယ်
+
                 bot.copy_message(
                     chat_id=target_channel,
                     from_chat_id=chat_id,
                     message_id=msg.message_id,
-                    caption=original_caption
+                    caption=final_caption
                 )
                 success_count += 1
                 # Rate Limit မထိအောင် ၃ စက္ကန့်လောက် စောင့်တာ ပိုစိတ်ချရတယ်
@@ -337,19 +346,18 @@ def receive_video(message):
 
 @bot.message_handler(func=lambda m: m.chat.id in pending_files, content_types=['text'])
 def receive_caption(message):
-    if not is_authorized(message.from_user.id): return
-
-    chat_id = message.chat.id
-    user_input = message.text
-    file_info = pending_files.get(chat_id)
-    target_channel = current_config['channel_id']
-    
-    if not file_info: return
-
+    # ... (auth စစ်တဲ့ code များ)
     try:
-        final_caption = user_input
-        if current_config.get('custom_caption'):
-            final_caption += f"\n\n{current_config['custom_caption']}"
+        user_input = message.text
+        custom_text = current_config.get('custom_caption', "")
+        
+        if custom_text:
+            max_input_len = 1024 - len(custom_text) - 4
+            if len(user_input) > max_input_len:
+                user_input = user_input[:max_input_len]
+            final_caption = f"{user_input}\n\n{custom_text}"
+        else:
+            final_caption = user_input[:1024]
 
         bot.copy_message(
             chat_id=target_channel,
@@ -401,6 +409,7 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
+
 
 
 
