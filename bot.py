@@ -58,20 +58,6 @@ def remove_auth_user(user_id):
 # Bot စrun တာနဲ့ DB ထဲက Data ကို ဆွဲတင်ထားမယ်
 current_config = get_config()
 
-def get_safe_caption(original_text, custom_text):
-    """စာလုံးရေ ၁၀၂၄ ကျော်ရင် original ကိုဖြတ်ပြီး custom caption ကို ထိန်းသိမ်းပေးမည်"""
-    if not original_text: original_text = ""
-    if not custom_text:
-        return original_text[:1024]
-    
-    # Custom text အတွက် နေရာဖယ်ပြီး ကျန်တာကိုပဲ original ကနေယူမယ်
-    max_original_len = 1024 - len(custom_text) - 4
-    
-    if len(original_text) > max_original_len:
-        original_text = original_text[:max_original_len]
-        
-    return f"{original_text}\n\n{custom_text}"
-
 # Single file တွေအတွက် caption စောင့်ဖို့
 pending_files = {}
 # Batch (အများကြီး) လာရင် ခဏထိန်းထားဖို့
@@ -257,33 +243,36 @@ def process_batch(chat_id):
         return
 
     messages = batch_data[chat_id]['messages']
-    # ဒီနေရာမှာ current_config ထဲကနေ ဆွဲထုတ်ပါ
-    target_channel = current_config.get('channel_id') 
+    target_channel = current_config['channel_id'] 
 
-    if not target_channel:
-        bot.send_message(chat_id, "❌ Channel ID မရှိသေးပါ။ /setchannel အရင်လုပ်ပါ။")
-        return
-
-    # 1. BATCH PROCESSING
+    # 1. BATCH PROCESSING (ဖိုင်အများကြီးလာရင်)
     if len(messages) > 1:
-        # ... (အောင်မြင်ကြောင်း စာပို့သည့်အပိုင်း)
+        total_files = len(messages)
+        bot.send_message(chat_id, f"✅ ဇာတ်ကား {total_files} ကား လက်ခံရရှိသည်။ Channel သို့ ပို့နေပါပြီ...\n(ခဏစောင့်ပါ၊ ပြီးရင် Report ပြန်ပို့ပေးပါမည်)")
+        
+        success_count = 0
+        failed_messages = [] # Fail ဖြစ်တဲ့ကောင်တွေကို မှတ်ထားမယ့် List
+
         for msg in messages:
-            try:
-                # အပေါ်က helper function ကို သုံးပြီး caption ထုတ်မယ်
-                final_cap = get_safe_caption(msg.caption, current_config.get('custom_caption'))
-                
-                bot.copy_message(
-                    chat_id=target_channel,
-                    from_chat_id=chat_id,
-                    message_id=msg.message_id,
-                    caption=final_cap
-                )
-                time.sleep(3) 
-            except Exception as e:
-                # ... (fail ဖြစ်လျှင် မှတ်တမ်းတင်သည့်အပိုင်း)
-                success_count += 1
-                # Rate Limit မထိအောင် ၃ စက္ကန့်လောက် စောင့်တာ ပိုစိတ်ချရတယ်
-                time.sleep(3) 
+    try:
+        original_caption = msg.caption if msg.caption else ""
+        custom_txt = current_config.get('custom_caption') if current_config.get('custom_caption') else ""
+        
+        # စုစုပေါင်း ၁၀၂၄ ထက်မကျော်အောင် တွက်ချက်ခြင်း
+        if custom_txt:
+            # custom_txt + newline ၂ ခု အတွက် နေရာဖယ်ပြီး original ကို ဖြတ်မယ်
+            max_original_len = 1024 - len(custom_txt) - 2
+            safe_original = original_caption[:max_original_len]
+            final_caption = f"{safe_original}\n\n{custom_txt}"
+        else:
+            final_caption = original_caption[:1024]
+
+        bot.copy_message(
+            chat_id=target_channel,
+            from_chat_id=chat_id,
+            message_id=msg.message_id,
+            caption=final_caption
+        )
 
             except Exception as e:
                 print(f"Error sending msg {msg.message_id}: {e}")
@@ -357,20 +346,29 @@ def receive_caption(message):
     chat_id = message.chat.id
     user_input = message.text
     file_info = pending_files.get(chat_id)
-    # ဒီနေရာမှာ target_channel ကို ပြန်သတ်မှတ်ပေးပါ
-    target_channel = current_config.get('channel_id')
+    target_channel = current_config['channel_id']
     
-    if not file_info or not target_channel: return
+    if not file_info: return
 
     try:
-        # helper function ကို သုံးမယ်
-        final_cap = get_safe_caption(user_input, current_config.get('custom_caption'))
+        custom_txt = current_config.get('custom_caption') # ပုံသေစာသားကို ယူသည်
+        
+        # Telegram ရဲ့ limit က 1024 characters ဖြစ်သည်
+        if custom_txt:
+            # Custom caption အတွက် နေရာဖယ်ပြီး ကျန်တာကိုပဲ original caption ထဲက ယူမည်
+            # '\n\n' (၂ လုံး) အတွက်ပါ ထည့်တွက်ထားသည်
+            max_input_len = 1024 - len(custom_txt) - 2
+            safe_input = user_input[:max_input_len]
+            final_caption = f"{safe_input}\n\n{custom_txt}"
+        else:
+            # Custom caption မရှိရင် စာသား ၁၀၂၄ လုံးအထိပဲ ယူမည်
+            final_caption = user_input[:1024]
 
         bot.copy_message(
             chat_id=target_channel,
             from_chat_id=file_info['from_chat_id'],
             message_id=file_info['message_id'],
-            caption=final_cap
+            caption=final_caption
         )
         bot.reply_to(message, "✅ Channel သို့ ပို့ပြီးပါပြီ။")
     except Exception as e:
@@ -416,8 +414,6 @@ if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot Started with MongoDB Support...")
     bot.infinity_polling()
-
-
 
 
 
